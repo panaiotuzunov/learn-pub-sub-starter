@@ -23,7 +23,7 @@ func main() {
 		log.Fatalf("error creating AMQP channel: %v", err)
 	}
 	defer connChan.Close()
-	gamelogic.PrintClientHelp()
+	gamelogic.PrintServerHelp()
 outer:
 	for {
 		input := gamelogic.GetInput()
@@ -54,9 +54,4 @@ outer:
 			continue
 		}
 	}
-
-	// signals := make(chan os.Signal, 1)
-	// signal.Notify(signals, os.Interrupt)
-	// <-signals
-	// fmt.Println("Program is shutting down...")
 }
