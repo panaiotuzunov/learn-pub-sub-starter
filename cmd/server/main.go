@@ -12,17 +12,24 @@ import (
 
 func main() {
 	connStr := "amqp://guest:guest@localhost:5672/"
-	connection, err := amqp.Dial(connStr)
+	conn, err := amqp.Dial(connStr)
 	if err != nil {
 		log.Fatalf("error connecting to RabbitMQ: %v", err)
 	}
-	defer connection.Close()
+	defer conn.Close()
 	fmt.Println("Connection to RabbitMQ established")
-	connChan, err := connection.Channel()
+	connChan, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("error creating AMQP channel: %v", err)
 	}
 	defer connChan.Close()
+	if _, _, err = pubsub.DeclareAndBind(conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		routing.GameLogSlug+".*",
+		pubsub.SimpleQueueDurable); err != nil {
+		log.Fatalf("error declaring queue: %v", err)
+	}
 	gamelogic.PrintServerHelp()
 outer:
 	for {
