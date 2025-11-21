@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -48,4 +49,34 @@ func DeclareAndBind(
 		return &amqp.Channel{}, amqp.Queue{}, err
 	}
 	return ch, queue, nil
+}
+
+func SubscribeJSON[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	handler func(T),
+) error {
+	chanQueue, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
+	if err != nil {
+		return err
+	}
+	chanDelivery, err := chanQueue.Consume(queue.Name, "", false, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+	go func() {
+		for msg := range chanDelivery {
+			var data T
+			if err := json.Unmarshal(msg.Body, &data); err != nil {
+				log.Printf("error unmarshaling message: %v", err)
+				continue
+			}
+			handler(data)
+			msg.Ack(false)
+		}
+	}()
+	return nil
 }
