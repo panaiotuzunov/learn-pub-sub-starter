@@ -9,11 +9,19 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type SimpleQueueType string
+type SimpleQueueType int
 
 const (
-	SimpleQueueDurable   SimpleQueueType = "durable"
-	SimpleQueueTransient SimpleQueueType = "transient"
+	SimpleQueueDurable SimpleQueueType = iota
+	SimpleQueueTransient
+)
+
+type AckType int
+
+const (
+	Ack AckType = iota
+	NackRequeue
+	NackDiscard
 )
 
 func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
@@ -41,7 +49,14 @@ func DeclareAndBind(
 	if err != nil {
 		return &amqp.Channel{}, amqp.Queue{}, err
 	}
-	queue, err := ch.QueueDeclare(queueName, queueType == SimpleQueueDurable, queueType == SimpleQueueTransient, queueType == SimpleQueueTransient, false, nil)
+	table := amqp.Table{}
+	table["x-dead-letter-exchange"] = "peril_dlx"
+	queue, err := ch.QueueDeclare(queueName,
+		queueType == SimpleQueueDurable,
+		queueType == SimpleQueueTransient,
+		queueType == SimpleQueueTransient,
+		false,
+		table)
 	if err != nil {
 		return &amqp.Channel{}, amqp.Queue{}, err
 	}
@@ -57,7 +72,7 @@ func SubscribeJSON[T any](
 	queueName,
 	key string,
 	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
-	handler func(T),
+	handler func(T) AckType,
 ) error {
 	chanQueue, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -74,8 +89,18 @@ func SubscribeJSON[T any](
 				log.Printf("error unmarshaling message: %v", err)
 				continue
 			}
-			handler(data)
-			msg.Ack(false)
+			ackReturn := handler(data)
+			switch ackReturn {
+			case Ack:
+				msg.Ack(false)
+				log.Println("Called msg.Ack(false)")
+			case NackRequeue:
+				msg.Nack(false, true)
+				log.Println("msg.Nack(false, true) - requeue")
+			case NackDiscard:
+				msg.Nack(false, false)
+				log.Println("msg.Nack(false, false) no requeue")
+			}
 		}
 	}()
 	return nil
