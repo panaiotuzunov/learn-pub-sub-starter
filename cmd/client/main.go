@@ -44,8 +44,17 @@ func main() {
 		routing.ArmyMovesPrefix+"."+username,
 		routing.ArmyMovesPrefix+".*",
 		pubsub.SimpleQueueTransient,
-		handlerMove(gs)); err != nil {
+		handlerMove(gs, connChan)); err != nil {
 		log.Fatalf("Could not subscribe to move messages: %v", err)
+	}
+	if err := pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		"war",
+		routing.WarRecognitionsPrefix+".*",
+		pubsub.SimpleQueueDurable,
+		handlerWar(gs)); err != nil {
+		log.Fatalf("Could not subscribe to war messages: %v", err)
 	}
 	for {
 		input := gamelogic.GetInput()
