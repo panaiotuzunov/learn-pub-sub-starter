@@ -84,13 +84,14 @@ func DeclareAndBind(
 	return ch, queue, nil
 }
 
-func SubscribeJSON[T any](
+func subscribe[T any](
 	conn *amqp.Connection,
 	exchange,
 	queueName,
 	key string,
-	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	queueType SimpleQueueType,
 	handler func(T) AckType,
+	unmarshaller func([]byte) (T, error),
 ) error {
 	chanQueue, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -102,9 +103,9 @@ func SubscribeJSON[T any](
 	}
 	go func() {
 		for msg := range chanDelivery {
-			var data T
-			if err := json.Unmarshal(msg.Body, &data); err != nil {
-				log.Printf("error unmarshaling message: %v", err)
+			data, err := unmarshaller(msg.Body)
+			if err != nil {
+				log.Println(err)
 				continue
 			}
 			ackReturn := handler(data)
@@ -122,4 +123,56 @@ func SubscribeJSON[T any](
 		}
 	}()
 	return nil
+}
+
+func SubscribeJSON[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T) AckType,
+) error {
+	return subscribe(
+		conn,
+		exchange,
+		queueName,
+		key,
+		queueType,
+		handler,
+		func(b []byte) (T, error) {
+			var data T
+			if err := json.Unmarshal(b, &data); err != nil {
+				return data, fmt.Errorf("error unmarshaling message: %v", err)
+			}
+			return data, nil
+		},
+	)
+}
+
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T) AckType,
+) error {
+	return subscribe(
+		conn,
+		exchange,
+		queueName,
+		key,
+		queueType,
+		handler,
+		func(body []byte) (T, error) {
+			b := bytes.NewBuffer(body)
+			dec := gob.NewDecoder(b)
+			var data T
+			if err := dec.Decode(&data); err != nil {
+				return data, err
+			}
+			return data, nil
+		},
+	)
 }

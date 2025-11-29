@@ -23,12 +23,13 @@ func main() {
 		log.Fatalf("error creating AMQP channel: %v", err)
 	}
 	defer connChan.Close()
-	if _, _, err = pubsub.DeclareAndBind(conn,
+	if err := pubsub.SubscribeGob(conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",
-		pubsub.SimpleQueueDurable); err != nil {
-		log.Fatalf("error declaring queue: %v", err)
+		pubsub.SimpleQueueDurable,
+		handlerLog()); err != nil {
+		log.Fatalf("error subscribing to game logs queue: %v", err)
 	}
 	gamelogic.PrintServerHelp()
 outer:
