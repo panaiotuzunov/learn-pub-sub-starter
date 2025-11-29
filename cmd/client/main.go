@@ -53,7 +53,7 @@ func main() {
 		"war",
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.SimpleQueueDurable,
-		handlerWar(gs)); err != nil {
+		handlerWar(gs, connChan)); err != nil {
 		log.Fatalf("Could not subscribe to war messages: %v", err)
 	}
 	for {
