@@ -97,6 +97,9 @@ func subscribe[T any](
 	if err != nil {
 		return err
 	}
+	if err := chanQueue.Qos(10, 0, false); err != nil {
+		return err
+	}
 	chanDelivery, err := chanQueue.Consume(queue.Name, "", false, false, false, false, nil)
 	if err != nil {
 		return err

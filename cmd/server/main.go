@@ -41,7 +41,10 @@ outer:
 		switch input[0] {
 		case "pause":
 			log.Println("Sending pause message...")
-			if err := pubsub.PublishJSON(connChan, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{IsPaused: true}); err != nil {
+			if err := pubsub.PublishJSON(connChan,
+				routing.ExchangePerilDirect,
+				routing.PauseKey,
+				routing.PlayingState{IsPaused: true}); err != nil {
 				log.Fatalf("Error publishing message: %v", err)
 			}
 			continue
